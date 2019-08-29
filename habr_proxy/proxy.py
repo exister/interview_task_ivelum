@@ -1,13 +1,26 @@
+import re
 import typing
 import asyncio
 import logging
-import nltk
 from aiohttp import ClientSession, ClientTimeout, web
 from bs4 import BeautifulSoup
-from nltk import word_tokenize
 
 logger = logging.getLogger(__name__)
-nltk.download("punkt")
+
+WORD_RE = re.compile(
+    r"""
+    (?:[^\W\d_](?:[^\W\d_]|['\-_])+[^\W\d_]) # Words with apostrophes or dashes.
+    |
+    (?:[+\-]?\d+[,/.:-]\d+[+\-]?)  # Numbers, including fractions, decimals.
+    |
+    (?:[\w_]+)                     # Words without apostrophes or dashes.
+    |
+    (?:\.(?:\s*\.){1,})            # Ellipsis dots.
+    |
+    (?:\S)                         # Everything else that isn't whitespace.
+    """,
+    re.VERBOSE | re.I | re.UNICODE
+)
 
 
 class Proxy:
@@ -56,7 +69,10 @@ class Proxy:
         else:
             if res.content_type != "text/html":
                 raw = await res.read()
-                return web.Response(body=raw, status=res.status, headers=res.headers)
+                headers = res.headers.copy()
+                headers.pop("Transfer-Encoding", None)
+                headers.pop("Content-Encoding", None)
+                return web.Response(body=raw, status=res.status, headers=headers)
             html = await res.text(encoding="utf-8")
             return html
 
@@ -104,11 +120,13 @@ class Proxy:
 
         """
         for string in soup.find_all(string=lambda x: x and x.parent.name not in ("script", "style")):
-            changed = False
-            tokens = word_tokenize(str(string))
-            for i, token in enumerate(tokens):
-                if len(token) == self.WORD_LENGTH:
-                    tokens[i] = token + "™"
-                    changed = True
-            if changed:
-                string.replace_with(" ".join(tokens))
+            chars = list(string)
+            offset = 0
+            for m in WORD_RE.finditer(string):
+                start, stop = m.span()
+                if start != stop and stop - start == self.WORD_LENGTH:
+                    chars.insert(stop + offset, "™")
+                    offset += 1
+
+            if offset > 0:
+                string.replace_with("".join(chars))

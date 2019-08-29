@@ -6,11 +6,11 @@ from server import app
 
 
 def test_replace_words():
-    markup = "<html><head><script>qqqqqq qqqqqq</script></head><body>test <a>qqqqqq qqqqq</a></body></html>"
+    markup = '<html><head><script>qqqqqq qqqqqq</script></head><body>test <a>qqqqqq qqqqq qqqqqq/qqqqqq "qqqqqq"</a></body></html>'
 
     soup = BeautifulSoup(markup=markup, features="html5lib", from_encoding="utf-8")
     Proxy(None).replace_words(soup)
-    assert str(soup) == "<html><head><script>qqqqqq qqqqqq</script></head><body>test <a>qqqqqq™ qqqqq</a></body></html>"
+    assert str(soup) == '<html><head><script>qqqqqq qqqqqq</script></head><body>test <a>qqqqqq™ qqqqq qqqqqq™/qqqqqq™ "qqqqqq™"</a></body></html>'
 
 
 def test_replace_links():
